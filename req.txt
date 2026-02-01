@@ -1,0 +1,14 @@
+
+langchain 
+langchain-community 
+langchain-openai 
+langchain-anthropic 
+langchain-mistralai 
+langchain-google-genai 
+faiss-cpu
+chromadb
+langchain-chroma
+typing
+python-dotenv
+google-generativeai
+google genai
