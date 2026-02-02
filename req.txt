@@ -1,14 +1,12 @@
 
-langchain 
-langchain-community 
-langchain-openai 
-langchain-anthropic 
-langchain-mistralai 
-langchain-google-genai 
+langchain
+langchain-community
+langchain-openai
+langchain-google-genai
+# Vector Stores
 faiss-cpu
-chromadb
 langchain-chroma
-typing
+# Utilities
 python-dotenv
+# Core SDKs
 google-generativeai
-google genai
