@@ -11,6 +11,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 # 1. ENV SETUP
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1" 
+chat_history = []
 
 # 2. VECTOR STORE SETUP (The "Library")
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=150)
@@ -21,6 +22,28 @@ retriever = vector_store.as_retriever(search_kwargs={"k": 3})
 
 # 3. INITIALIZE THE MODEL
 model = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0)
+def rewrite_query(chat_history,latest_query):
+    history_text = "\n".join(
+        [f"User: {m.content}" if isinstance(m, HumanMessage) else f"Assistant: {m.content}"
+         for m in chat_history[-6:]]  # only last few msgs
+    )
+
+    prompt = f"""
+You are a query rewriting assistant.
+
+Conversation History:
+{history_text}
+
+Latest User Question:
+{latest_query}
+
+Rewrite the latest question into a clear, standalone search query.
+Do NOT answer it. Only rewrite.
+"""
+
+    rewritten = model.invoke(prompt).content.strip()
+    print(rewritten)
+    return rewritten
 
 # 4. THE AGENTIC TOOL
 @tool
@@ -29,6 +52,7 @@ def logistics_search(query: str) -> str:
     Use this tool whenever you need facts to answer a question."""
     
     # Step A: Retrieve
+    query = rewrite_query(chat_history,query)
     docs = retriever.invoke(query)
     if not docs:
         return "No information found in the local database."
@@ -52,7 +76,7 @@ def logistics_search(query: str) -> str:
 
 # 5. AGENT SETUP
 tools = [logistics_search]
-chat_history = []
+
 
 agent = create_agent(
     model=model,
