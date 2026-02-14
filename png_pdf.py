@@ -11,7 +11,7 @@ import io
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 # 🔗 PDF URL
-def pdfContent(pdfUrl,OUTPUT_FILE):
+def pdfContent(pdfUrl):
 
 # Download PDF
     headers = {"User-Agent": "Mozilla/5.0"}  # helps if site blocks bots
@@ -30,11 +30,9 @@ def pdfContent(pdfUrl,OUTPUT_FILE):
         curr_text = page.get_text().strip()
 
         if curr_text:
-            print(f"Page {page_num+1}: Text layer found ✅")
             full_text += (curr_text + "\n")
 
         else:
-            print(f"Page {page_num+1}: No text layer → Using OCR 🔍")
 
         # --- Step 2: Convert page to image ---
             pix = page.get_pixmap(dpi=300)
@@ -48,6 +46,4 @@ def pdfContent(pdfUrl,OUTPUT_FILE):
     doc.close()
 
 #print("\n\n========== FINAL EXTRACTED TEXT ==========\n")
-    with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
-        f.write("Source:" + pdfUrl + "\n")
-        f.write(full_text + "\n")
+    return full_text

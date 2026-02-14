@@ -1,19 +1,25 @@
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
-import time
 from collections import deque
+import time
 import re
-from png_pdf import pdfContent
+import json
+
+from png_pdf import pdfContent  # must return extracted text
 
 BASE_URL = "https://iitj.ac.in/"
+OUTPUT_JSON = "website_data.json"
 
 visited_links = set()
 pdf_links = set()
-png_links = set()
 
-OUTPUT_FILE = "website_content.txt"
+data = {
+    "pages": [],
+    "pdfs": []
+}
 
+# ------------------ HELPERS ------------------
 
 def is_internal(url):
     return urlparse(url).netloc == urlparse(BASE_URL).netloc
@@ -26,36 +32,31 @@ def is_english(url):
         or url.endswith("/hi")
         or "lang=hi" in url
         or "lg=hi" in url
-        or url.endswith("hi")
+        or "Hindi" in url
+        or "hindi" in url
+        or "HINDI" in url
     )
 
 
 def extract_clean_text(soup):
-    """Remove junk and extract meaningful content"""
-
-    # ❌ Remove layout + non-content sections
+    # remove junk
     for tag in soup(["script", "style", "nav", "header", "footer", "aside", "noscript"]):
         tag.decompose()
 
-    # ✅ Only keep meaningful content tags
-    content_tags = soup.find_all(["p", "h1", "h2", "h3", "li"])
-
     texts = []
-    for tag in content_tags:
+    for tag in soup.find_all(["p", "h1", "h2", "h3", "li"]):
         text = tag.get_text(" ", strip=True)
-
-        # Remove very small or useless fragments
         if len(text) > 30:
             texts.append(text)
 
-    page_text = "\n".join(texts)
+    text = " ".join(texts)
+    text = re.sub(r"\s+", " ", text)
+    text = re.sub(r"[^\x00-\x7F]+", " ", text)
 
-    # 🧼 Cleaning
-    page_text = re.sub(r"\s+", " ", page_text)  # normalize whitespace
-    page_text = re.sub(r"[^\x00-\x7F]+", " ", page_text)  # remove weird unicode
+    return text.strip()
 
-    return page_text.strip()
-
+# ------------------ CRAWLER ------------------
+count =0
 
 def bfs(start_url):
     queue = deque([start_url])
@@ -66,23 +67,22 @@ def bfs(start_url):
         if url in visited_links or not is_internal(url) or not is_english(url):
             continue
 
-        print("Visiting page:", url)
+        print("🌐 Visiting:", url)
         visited_links.add(url)
 
         try:
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=6)
             soup = BeautifulSoup(response.text, "html.parser")
 
-            # -------- CLEAN TEXT EXTRACTION --------
+            # -------- PAGE TEXT --------
             page_text = extract_clean_text(soup)
+            if page_text:
+                data["pages"].append({
+                    "url": url,
+                    "text": page_text
+                })
 
-            if page_text:  # avoid saving empty pages
-                with open(OUTPUT_FILE, "a", encoding="utf-8") as f:
-                    f.write("\n" + "=" * 80 + "\n")
-                    f.write(f"Source: {url}\n\n")
-                    f.write(page_text + "\n")
-
-            # -------- LINK CHECK --------
+            # -------- LINKS --------
             for tag in soup.find_all("a", href=True):
                 link = urljoin(url, tag["href"]).split("#")[0]
 
@@ -90,27 +90,45 @@ def bfs(start_url):
                     continue
 
                 if link.lower().endswith(".pdf"):
-                    if link not in pdf_links:
-                        pdf_links.add(link)
-                        print("PDF found:", link)
-                        pdfContent(link, OUTPUT_FILE)
+                    if link in pdf_links:
+                        continue
+
+                    print("📄 PDF found:", link)
+                    pdf_links.add(link)
+
+                    try:
+                        pdf_text = pdfContent(link)
+                        if pdf_text.strip():
+                            data["pdfs"].append({
+                                "url": link,
+                                "text": pdf_text
+                            })
+                    except Exception as e:
+                        print("❌ PDF error:", link, e)
+
                 else:
                     if link not in visited_links:
                         queue.append(link)
+                        
+                        
 
             time.sleep(1)
 
         except Exception as e:
-            print("Error at", url, ":", e)
+            print("❌ Page error:", url, e)
+        
+        global count
+        count += 1
+        if count==20 : break
 
+# ------------------ RUN ------------------
 
-# Clear old file
-open(OUTPUT_FILE, "w", encoding="utf-8").close()
-
-# Start crawl
 bfs(BASE_URL)
 
-print("\nTotal pages visited:", len(visited_links))
-print("Total PDFs found:", len(pdf_links))
-print("Total PNGs found:", len(png_links))
-print("All data saved to:", OUTPUT_FILE)
+with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+
+print("\n✅ Crawl complete")
+print("Pages scraped:", len(data["pages"]))
+print("PDFs scraped:", len(data["pdfs"]))
+print("Saved to:", OUTPUT_JSON)
