@@ -16,53 +16,17 @@ chatHistory = []
 
 # -------------------- 2. LOAD SCRAPED JSON --------------------
 
-with open("website_data.json", "r", encoding="utf-8") as f:
-    data = json.load(f)
-    print("Website data found!")
-
-texts = []
-metadatas = []
-
-for page in data["pages"]:
-    texts.append(page["text"])
-    metadatas.append({
-        "source": page["url"],
-        "type": "html"
-    })
-
-for pdf in data["pdfs"]:
-    texts.append(pdf["text"])
-    metadatas.append({
-        "source": pdf["url"],
-        "type": "pdf"
-    })
-
-# -------------------- 3. VECTOR STORE SETUP --------------------
-
-textSplitter = RecursiveCharacterTextSplitter(
-    chunk_size=1000,
-    chunk_overlap=150
-)
-
-split_texts = []
-split_metadatas = []
-
-for text, meta in zip(texts, metadatas):
-    chunks = textSplitter.split_text(text)
-    split_texts.extend(chunks)
-    split_metadatas.extend([meta] * len(chunks))
-
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-vector_store = FAISS.from_texts(
-    texts=split_texts,
-    embedding=embeddings,
-    metadatas=split_metadatas
+vector_store = FAISS.load_local(
+    "faiss_store",
+    embeddings,
+    allow_dangerous_deserialization=True
 )
 
-retriever = vector_store.as_retriever(search_kwargs={"k": 3})
+retriever = vector_store.as_retriever(search_kwargs={"k": 8})
 
 # -------------------- 4. MODEL --------------------
 
@@ -134,10 +98,15 @@ agent = create_agent(
     model=model,
     tools=[logistics_search],
     system_prompt=(
-        "You are a helpful assistant. "
-        "Always use the logistics_search tool to find facts. "
-        "Cite the provided sources in your answer. "
-        "If no information found,say so"
+        "You are a helpful assistant.\n\n"
+        "Always use the logistics_search tool to find facts.\n\n"
+        "Answer using this structure:\n"
+        "1. Title (based on the query)\n"
+        "2. Key Information (bullet points)\n"
+        "3. Additional Details (if any)\n"
+        "4. Sources (bullet list)\n\n"
+        "Use clear spacing between sections.\n"
+        "Do not write large paragraphs.\n"
     ),
 )
 
