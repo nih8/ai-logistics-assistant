@@ -153,3 +153,9 @@ print("\n✅ Crawl complete")
 print("Pages scraped:", len(data["pages"]))
 print("PDFs scraped:", len(data["pdfs"]))
 print("Saved to:", OUTPUT_JSON)
+
+"""
+After the entire website is crawled and data is extracted the vector store needs to be refreshed as well.
+"""
+import subprocess
+subprocess.run(["python", "vector_store.py"])
