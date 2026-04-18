@@ -6,7 +6,8 @@ Builds a logitics tool which returns the appropriate response and sources to the
 """
 import os
 import json
-import api_config  # still allowed if you want other configs
+import api_config
+from api_config import rotate_api_key
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_community.vectorstores import FAISS
